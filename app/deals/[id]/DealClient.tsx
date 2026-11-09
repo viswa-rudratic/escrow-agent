@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import Nav from "@/components/Nav";
+import Icon from "@/components/Icon";
 import type { Deal, Milestone } from "@/lib/store";
 import { STATUS_LABEL, usd } from "@/lib/ui";
 
@@ -14,6 +16,7 @@ const VERDICT_PLAIN: Record<string, string> = {
   reject: "Work rejected",
   review: "Not sure, buyer decides",
 };
+const VERDICT_ICON: Record<string, string> = { release: "check", reject: "x", review: "alert" };
 
 export default function DealClient() {
   const { id } = useParams<{ id: string }>();
@@ -73,17 +76,26 @@ export default function DealClient() {
     post("deliver", f, false);
   }
 
-  if (!deal) return <main className="wrap"><p className="muted pt-16">Loading the agreement…</p></main>;
+  if (!deal)
+    return (
+      <>
+        <Nav />
+        <main className="shell"><p className="muted pt-16">Loading the agreement…</p></main>
+      </>
+    );
 
   const current = deal.milestones.find((m) => m.status === "pending");
   const review = deal.milestones.find((m) => m.status === "needs_review");
   const buyerLink = typeof window !== "undefined" ? `${window.location.origin}/deals/${deal.id}?as=buyer` : "";
   const honest = (m: Milestone) =>
     `Delivered "${m.label}". ` + m.criteria.map((c) => `Done: ${c}.`).join(" ");
-  const paidOut = deal.milestones.filter((m) => m.status === "released").reduce((s, m) => s + m.amountCents, 0);
+  const sum = (st: string[]) => deal.milestones.filter((m) => st.includes(m.status)).reduce((s, m) => s + m.amountCents, 0);
+  const funded = deal.status !== "awaiting_payment";
+  const paidOut = sum(["released"]);
+  const returned = sum(["refunded"]);
+  const held = funded ? sum(["pending", "needs_review"]) : 0;
   const finished = ["released", "refunded", "partial"].includes(deal.status);
 
-  const funded = deal.status !== "awaiting_payment";
   const steps = [
     { label: "Agreement written", done: true },
     { label: "Money held by PayPal", done: funded },
@@ -91,214 +103,317 @@ export default function DealClient() {
   ];
   const nowIdx = steps.findIndex((s) => !s.done);
 
+  const nodeFor = (m: Milestone) => {
+    if (m.status === "released") return <span className="node ok"><Icon name="check" size={13} /></span>;
+    if (m.status === "refunded") return <span className="node bad"><Icon name="x" size={12} /></span>;
+    if (m.status === "needs_review") return <span className="node warn"><Icon name="alert" size={12} /></span>;
+    if (funded && current?.id === m.id) return <span className="node now" />;
+    return <span className="node" />;
+  };
+
   return (
-    <main className="wrap">
-      <header className="masthead">
-        <Link href="/" className="link">&larr; All deals</Link>
-        <span className="kicker">Deal {deal.id}</span>
-      </header>
+    <>
+      <Nav />
+      <main className="shell" style={{ paddingTop: "1.6rem", paddingBottom: "5rem" }}>
+        <Link href="/" className="link-quiet inline-flex items-center gap-1.5 text-sm" style={{ textDecoration: "none" }}>
+          <Icon name="back" size={16} /> All deals
+        </Link>
 
-      <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
-        <h1 className="title">{deal.title}</h1>
-        <span className={`badge mt-2 ${deal.status}`}>{STATUS_LABEL[deal.status]}</span>
-      </div>
-      <p className="muted mt-3">{deal.spec}</p>
-
-      <dl className="mt-6 grid grid-cols-3 gap-4 border-y border-[var(--ink)] py-4">
-        <div><dt className="kicker">Buyer</dt><dd className="mt-1 font-semibold">{deal.buyer}</dd></div>
-        <div><dt className="kicker">Seller</dt><dd className="mt-1 font-semibold">{deal.seller}</dd></div>
-        <div className="text-right"><dt className="kicker">Total</dt>
-          <dd className="mono mt-1 text-xl font-medium">{usd(deal.amountCents)}</dd>
-          {paidOut > 0 && <dd className="mt-1 text-sm font-semibold" style={{ color: "var(--green)" }}>{usd(paidOut)} paid out</dd>}
-        </div>
-      </dl>
-
-      <ol className="steps" aria-label="Deal progress">
-        {steps.map((s, i) => (
-          <li key={s.label} className={s.done ? "done" : i === nowIdx ? "now" : ""} aria-current={i === nowIdx ? "step" : undefined}>
-            <b>{s.done ? "✓" : i + 1}</b><span>{s.label}</span>
-          </li>
-        ))}
-      </ol>
-
-      <div className="mt-7 flex flex-wrap items-center gap-3">
-        <span className="hint">Viewing as</span>
-        <div className="tabs" role="tablist">
-          {(["seller", "buyer"] as const).map((r) => (
-            <button key={r} role="tab" aria-selected={role === r} className="tab" onClick={() => switchRole(r)}>
-              {r === "seller" ? `Seller view (${deal.seller})` : `Buyer view (${deal.buyer})`}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {err && <p className="err" role="alert">{err}</p>}
-
-      {/* WHAT HAPPENS NEXT */}
-      {deal.status === "awaiting_payment" && role === "seller" && (
-        <section className="next">
-          <span className="kicker">What happens next</span>
-          <h2>Send this link to the buyer</h2>
-          <p className="muted mt-2">They put the money into PayPal escrow. You are paid one stage at a time, only after the work is checked.</p>
-          <div className="mt-4 flex items-end gap-3">
-            <input readOnly aria-label="Buyer link" value={buyerLink} className="field mono text-sm" onFocus={(e) => e.target.select()} />
-            <button className="btn btn-ghost" onClick={() => { navigator.clipboard.writeText(buyerLink); setCopied(true); }}>{copied ? "Copied" : "Copy link"}</button>
-          </div>
-        </section>
-      )}
-
-      {deal.status === "awaiting_payment" && role === "buyer" && (
-        <section className="next">
-          <span className="kicker">What happens next</span>
-          <h2>Put {usd(deal.amountCents)} into escrow</h2>
-          <p className="muted mt-2">PayPal holds the money. The seller gets nothing until each stage is checked against the terms below. If the work is not as agreed, you get the rest back.</p>
-          <div className="mt-5">
-            <button disabled={busy} onClick={() => post("pay", "{}")} className="btn btn-paypal">
-              {busy ? "Opening PayPal…" : "Hold funds with PayPal"}
-            </button>
-          </div>
-        </section>
-      )}
-
-      {deal.status === "funded" && current && role === "seller" && (
-        <section className="next">
-          <span className="kicker">What happens next</span>
-          <h2>Hand over the work: {current.label}</h2>
-          <p className="muted mt-2">Describe what you did and attach proof. The AI checks it against the terms of this stage.</p>
-          <textarea className="field lined mt-3" rows={4} aria-label="Describe your delivery" placeholder="Describe what you delivered…" value={delivery} onChange={(e) => setDelivery(e.target.value)} />
-          <div className="mt-4 flex flex-wrap items-center gap-3">
-            <label className="filebtn">
-              <span>＋ Attach files</span>
-              <input key={current.id} type="file" multiple data-testid="files"
-                accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml,text/plain"
-                onChange={(e) => setFiles(Array.from(e.target.files ?? []).slice(0, 3))} />
-            </label>
-            <span className="hint">{files.length ? files.map((f) => f.name).join(", ") : "Images, SVG or text files. Up to 3."}</span>
-          </div>
-          <div className="mt-6 flex flex-wrap items-center gap-4">
-            <button disabled={busy || (!delivery.trim() && !files.length)} onClick={submitDelivery} className="btn btn-green">
-              {busy ? "Checking the work…" : "Submit for AI verification"}
-            </button>
-            {busy && <span className="hint" role="status">This can take up to a minute.</span>}
-            {!busy && !delivery.trim() && !files.length && <span className="hint">Add a description or a file to continue.</span>}
-          </div>
-          <div className="demo">
-            <span>Demo shortcuts:</span>
-            <button className="link" onClick={() => setDelivery(honest(current))}>fill in an honest delivery</button>
-            <button className="link" style={{ color: "var(--red)" }} onClick={() => setDelivery(SCAM)}>fill in a scam attempt</button>
-          </div>
-        </section>
-      )}
-
-      {deal.status === "funded" && role === "buyer" && (
-        <section className="next">
-          <span className="kicker">What happens next</span>
-          <h2>Waiting for the seller to deliver “{current?.label}”</h2>
-          <p className="muted mt-2">Your money is held safely by PayPal. You will see the AI&apos;s check here as soon as the seller submits.</p>
-        </section>
-      )}
-
-      {deal.status === "needs_review" && review && (
-        role === "buyer" ? (
-          <section className="next">
-            <span className="kicker">Your decision</span>
-            <h2>The AI could not decide on “{review.label}”</h2>
-            <p className="muted mt-2">Read the AI&apos;s notes below, then choose.</p>
-            <div className="mt-5 flex flex-wrap gap-4">
-              <button disabled={busy} onClick={() => post("resolve", JSON.stringify({ action: "release" }))} className="btn btn-green">Pay the seller {usd(review.amountCents)}</button>
-              <button disabled={busy} onClick={() => post("resolve", JSON.stringify({ action: "refund" }))} className="btn btn-red">Refund me</button>
+        <div className="mt-4 flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-3">
+              <h1 className="h2">{deal.title}</h1>
+              <span className={`pill ${deal.status}`}>{STATUS_LABEL[deal.status]}</span>
             </div>
-          </section>
-        ) : (
-          <section className="next">
-            <span className="kicker">What happens next</span>
-            <h2>Waiting for the buyer to review “{review.label}”</h2>
-          </section>
-        )
-      )}
-
-      {finished && (
-        <section className="next">
-          <span className="kicker">Finished</span>
-          <h2>
-            {deal.status === "released" && `All done. ${usd(paidOut)} was paid to ${deal.seller}.`}
-            {deal.status === "refunded" && `This deal was stopped. The money went back to ${deal.buyer}.`}
-            {deal.status === "partial" && `Partly paid. ${deal.seller} received ${usd(paidOut)}; the rest went back to ${deal.buyer}.`}
-          </h2>
-        </section>
-      )}
-
-      {deal.ambiguities.length > 0 && (
-        <div className="warn mt-8">
-          <p className="warn-title">Not clear in the original chat</p>
-          <ul className="dash mt-1 text-base">{deal.ambiguities.map((a) => <li key={a}>{a}</li>)}</ul>
+            <p className="muted mt-2 max-w-2xl">{deal.spec}</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="faint text-sm">Viewing as</span>
+            <div className="segctl" role="tablist">
+              {(["seller", "buyer"] as const).map((r) => (
+                <button key={r} role="tab" aria-selected={role === r} onClick={() => switchRole(r)}>
+                  {r === "seller" ? `Seller view (${deal.seller})` : `Buyer view (${deal.buyer})`}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
-      )}
 
-      <section className="sec">
-        <div className="sec-head"><h2>Stages and terms</h2></div>
-        <ol>
-          {deal.milestones.map((m, i) => (
-            <li key={m.id} className="entry">
-              <span className="numeral">{i + 1}</span>
-              <div>
-                <div className="row">
-                  <span className="text-lg font-semibold">{m.label}</span>
-                  <span className="leader" />
-                  <span className="mono text-sm">{m.percent}% · {usd(m.amountCents)}</span>
-                  <span className={`badge ${m.status}`}>{STATUS_LABEL[m.status]}</span>
+        <div className="card prog mt-6" aria-label="Deal progress">
+          {steps.map((s, i) => (
+            <div key={s.label} className="contents">
+              <span className={`prog-step ${s.done ? "done" : i === nowIdx ? "now" : ""}`} aria-current={i === nowIdx ? "step" : undefined}>
+                <span className={`node ${s.done ? "ok" : i === nowIdx ? "now" : ""}`}>{s.done && <Icon name="check" size={13} />}</span>
+                {s.label}
+              </span>
+              {i < steps.length - 1 && <span className={`prog-line ${s.done ? "done" : ""}`} />}
+            </div>
+          ))}
+        </div>
+
+        {err && <div className="callout bad mt-5" role="alert"><Icon name="alert" /><span>{err}</span></div>}
+
+        <div className="deal-grid mt-6">
+          {/* ================= MAIN ================= */}
+          <div className="min-w-0 grid gap-6">
+            {/* ---- next action ---- */}
+            {deal.status === "awaiting_payment" && role === "seller" && (
+              <section className="cta">
+                <div className="cta-top">
+                  <span className="cta-ic"><Icon name="arrow" size={22} /></span>
+                  <div>
+                    <h2>Send this link to the buyer</h2>
+                    <p className="muted mt-1">They put the money into PayPal escrow. You are paid one stage at a time, only after the work is checked.</p>
+                  </div>
                 </div>
-                <ul className="dash muted mt-2">{m.criteria.map((c) => <li key={c}>{c}</li>)}</ul>
+                <div className="mt-5 flex gap-3">
+                  <input readOnly aria-label="Buyer link" value={buyerLink} className="input mono text-sm" onFocus={(e) => e.target.select()} />
+                  <button className="btn btn-secondary" onClick={() => { navigator.clipboard.writeText(buyerLink); setCopied(true); }}>
+                    <Icon name={copied ? "check" : "copy"} size={16} /> {copied ? "Copied" : "Copy link"}
+                  </button>
+                </div>
+              </section>
+            )}
 
-                {m.files && m.files.length > 0 && (
-                  <div className="mt-4 flex flex-wrap items-end gap-3">
-                    {m.files.map((f) =>
-                      f.mime.startsWith("image/") ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img key={f.stored} src={`/api/deals/${deal.id}/files/${f.stored}`} alt={f.name}
-                          className="max-h-28 border border-[var(--ink)] bg-white p-1" />
-                      ) : (
-                        <a key={f.stored} href={`/api/deals/${deal.id}/files/${f.stored}`} className="link mono">{f.name}</a>
-                      ),
-                    )}
+            {deal.status === "awaiting_payment" && role === "buyer" && (
+              <section className="cta">
+                <div className="cta-top">
+                  <span className="cta-ic"><Icon name="lock" size={22} /></span>
+                  <div>
+                    <h2>Put {usd(deal.amountCents)} into escrow</h2>
+                    <p className="muted mt-1">PayPal holds the money. The seller gets nothing until each stage is checked against the terms below. If the work is not as agreed, you get the rest back.</p>
                   </div>
-                )}
+                </div>
+                <div className="mt-5">
+                  <button disabled={busy} onClick={() => post("pay", "{}")} className="btn btn-lg btn-paypal">
+                    {busy ? "Opening PayPal…" : "Hold funds with PayPal"}
+                  </button>
+                </div>
+              </section>
+            )}
 
-                {m.verdict && (
-                  <div className="note">
-                    <p className="note-title">
-                      AI verdict: {VERDICT_PLAIN[m.verdict.decision] ?? m.verdict.decision}
-                      <span className="kicker font-normal"> · {Math.round(m.verdict.score * 100)}% match · {m.verdict.engine}</span>
-                    </p>
-                    <ul className="dash mt-2 text-base">{m.verdict.reasons.map((r) => <li key={r}>{r}</li>)}</ul>
-                    {m.verdict.evidenceNotes.length > 0 && (
-                      <>
-                        <p className="lbl mt-3">What the AI saw in the files</p>
-                        <ul className="dash mt-1 text-base italic">{m.verdict.evidenceNotes.map((r) => <li key={r}>{r}</li>)}</ul>
-                      </>
-                    )}
-                    {m.verdict.scamSignals.length > 0 && (
-                      <div className="flag">
-                        <p className="font-bold">Warning signs found</p>
-                        <ul className="dash mt-1 text-base">{m.verdict.scamSignals.map((s) => <li key={s}>{s}</li>)}</ul>
-                      </div>
-                    )}
+            {deal.status === "funded" && current && role === "seller" && (
+              <section className="cta">
+                <div className="cta-top">
+                  <span className="cta-ic info"><Icon name="file" size={22} /></span>
+                  <div>
+                    <h2>Hand over the work: {current.label}</h2>
+                    <p className="muted mt-1">Describe what you did and attach proof. The AI checks it against this stage&apos;s terms.</p>
                   </div>
-                )}
+                </div>
+                <textarea className="input mt-5" rows={4} aria-label="Describe your delivery" placeholder="Describe what you delivered…" value={delivery} onChange={(e) => setDelivery(e.target.value)} />
+                <div className="mt-4 flex flex-wrap items-center gap-3">
+                  <label className="filebtn">
+                    <Icon name="clip" size={16} /><span>Attach files</span>
+                    <input key={current.id} type="file" multiple data-testid="files"
+                      accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml,text/plain"
+                      onChange={(e) => setFiles(Array.from(e.target.files ?? []).slice(0, 3))} />
+                  </label>
+                  {files.length === 0 && <span className="faint text-sm">Images, SVG or text files. Up to 3.</span>}
+                  {files.map((f) => <span key={f.name} className="chip"><Icon name="image" size={13} />{f.name}</span>)}
+                </div>
+                <div className="mt-6 flex flex-wrap items-center gap-4">
+                  <button disabled={busy || (!delivery.trim() && !files.length)} onClick={submitDelivery} className="btn btn-lg">
+                    {busy ? "Checking the work…" : <>Submit for AI verification <Icon name="arrow" size={18} /></>}
+                  </button>
+                  {busy && <span className="faint text-sm" role="status">The AI is reading your files. This can take up to a minute.</span>}
+                  {!busy && !delivery.trim() && !files.length && <span className="faint text-sm">Add a description or a file to continue.</span>}
+                </div>
+                <div className="demo">
+                  <span>Demo shortcuts</span>
+                  <button className="link" onClick={() => setDelivery(honest(current))}>Fill an honest delivery</button>
+                  <button className="link" style={{ color: "var(--bad)" }} onClick={() => setDelivery(SCAM)}>Fill a scam attempt</button>
+                </div>
+              </section>
+            )}
+
+            {deal.status === "funded" && role === "buyer" && (
+              <section className="cta">
+                <div className="cta-top">
+                  <span className="cta-ic info"><Icon name="lock" size={22} /></span>
+                  <div>
+                    <h2>Waiting for the seller to deliver “{current?.label}”</h2>
+                    <p className="muted mt-1">Your {usd(held)} is held safely by PayPal. The AI&apos;s check will appear here as soon as the seller submits.</p>
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {deal.status === "needs_review" && review && (
+              role === "buyer" ? (
+                <section className="cta">
+                  <div className="cta-top">
+                    <span className="cta-ic warn"><Icon name="alert" size={22} /></span>
+                    <div>
+                      <h2>The AI could not decide on “{review.label}”</h2>
+                      <p className="muted mt-1">Read the AI&apos;s notes below, then choose.</p>
+                    </div>
+                  </div>
+                  <div className="mt-5 flex flex-wrap gap-3">
+                    <button disabled={busy} onClick={() => post("resolve", JSON.stringify({ action: "release" }))} className="btn btn-lg">Pay the seller {usd(review.amountCents)}</button>
+                    <button disabled={busy} onClick={() => post("resolve", JSON.stringify({ action: "refund" }))} className="btn btn-lg btn-danger">Refund me</button>
+                  </div>
+                </section>
+              ) : (
+                <section className="cta">
+                  <div className="cta-top">
+                    <span className="cta-ic warn"><Icon name="clock" size={22} /></span>
+                    <div><h2>Waiting for the buyer to review “{review.label}”</h2></div>
+                  </div>
+                </section>
+              )
+            )}
+
+            {finished && (
+              <section className="cta">
+                <div className="cta-top">
+                  <span className={`cta-ic ${deal.status === "refunded" ? "bad" : deal.status === "partial" ? "warn" : ""}`}>
+                    <Icon name={deal.status === "refunded" ? "undo" : "check"} size={22} />
+                  </span>
+                  <div>
+                    <h2>
+                      {deal.status === "released" && `All done. ${usd(paidOut)} was paid to ${deal.seller}.`}
+                      {deal.status === "refunded" && `This deal was stopped. The money went back to ${deal.buyer}.`}
+                      {deal.status === "partial" && `Partly paid. ${deal.seller} received ${usd(paidOut)}; the rest went back to ${deal.buyer}.`}
+                    </h2>
+                    <p className="muted mt-1">Every step is recorded in the history below.</p>
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {deal.ambiguities.length > 0 && (
+              <div className="callout warn">
+                <Icon name="alert" className="mt-0.5" />
+                <div>
+                  <b>Not clear in the original chat</b>
+                  <ul>{deal.ambiguities.map((a) => <li key={a}>{a}</li>)}</ul>
+                </div>
               </div>
-            </li>
-          ))}
-        </ol>
-      </section>
+            )}
 
-      <section className="sec">
-        <div className="sec-head"><h2>History</h2></div>
-        <ol className="log">
-          {deal.log.map((l, i) => (
-            <li key={i}><span>{new Date(l.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</span><span>{l.msg}</span></li>
-          ))}
-        </ol>
-      </section>
-    </main>
+            {/* ---- timeline ---- */}
+            <section>
+              <h2 className="h3 mb-4">Stages and terms</h2>
+              <ol className="tl">
+                {deal.milestones.map((m, i) => (
+                  <li key={m.id} className="tl-item">
+                    <div className="pt-4">{nodeFor(m)}</div>
+                    <div className="card tl-card">
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                        <h3 className="h3">{i + 1}. {m.label}</h3>
+                        <span className={`pill ${m.status}`}>{STATUS_LABEL[m.status]}</span>
+                        <span className="mono ml-auto font-medium">{usd(m.amountCents)} <span className="faint text-sm">· {m.percent}%</span></span>
+                      </div>
+                      <ul className="check-list mt-3">
+                        {m.criteria.map((c) => <li key={c}><Icon name="check" size={15} />{c}</li>)}
+                      </ul>
+
+                      {m.files && m.files.length > 0 && (
+                        <div className="mt-4 flex flex-wrap items-end gap-3">
+                          {m.files.map((f) =>
+                            f.mime.startsWith("image/") ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img key={f.stored} src={`/api/deals/${deal.id}/files/${f.stored}`} alt={f.name} className="thumb" />
+                            ) : (
+                              <a key={f.stored} href={`/api/deals/${deal.id}/files/${f.stored}`} className="chip"><Icon name="file" size={13} />{f.name}</a>
+                            ),
+                          )}
+                        </div>
+                      )}
+
+                      {m.verdict && (
+                        <div className="verdict">
+                          <div className="verdict-head">
+                            <span className={`verdict-ic ${m.verdict.decision}`}><Icon name={VERDICT_ICON[m.verdict.decision] ?? "alert"} size={16} /></span>
+                            <div className="min-w-0 flex-1">
+                              <p className="font-semibold">AI verdict: {VERDICT_PLAIN[m.verdict.decision] ?? m.verdict.decision}</p>
+                              <p className="faint text-xs">Checked by {m.verdict.engine}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="mono text-sm font-medium">{Math.round(m.verdict.score * 100)}% match</p>
+                              <div className="meter mt-1"><i style={{ width: `${Math.round(m.verdict.score * 100)}%`, background: m.verdict.decision === "reject" ? "var(--bad)" : m.verdict.decision === "review" ? "var(--warn)" : "var(--brand)" }} /></div>
+                            </div>
+                          </div>
+                          <ul className="check-list mt-3">
+                            {m.verdict.reasons.map((r) => <li key={r}><Icon name="spark" size={14} />{r}</li>)}
+                          </ul>
+                          {m.verdict.evidenceNotes.length > 0 && (
+                            <div className="evidence">
+                              <p className="mb-1 flex items-center gap-1.5 font-semibold" style={{ color: "var(--ink)" }}><Icon name="image" size={15} /> What the AI saw in the files</p>
+                              {m.verdict.evidenceNotes.map((r) => <p key={r}>{r}</p>)}
+                            </div>
+                          )}
+                          {m.verdict.scamSignals.length > 0 && (
+                            <div className="callout bad mt-3">
+                              <Icon name="alert" className="mt-0.5" />
+                              <div><b>Warning signs found</b>
+                                <ul>{m.verdict.scamSignals.map((s) => <li key={s}>{s}</li>)}</ul></div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            </section>
+
+            {/* ---- history ---- */}
+            <section>
+              <h2 className="h3 mb-3">History</h2>
+              <div className="card pad">
+                <ol className="log">
+                  {deal.log.map((l, i) => (
+                    <li key={i}>
+                      <time>{new Date(l.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</time>
+                      <span>{l.msg}</span>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            </section>
+          </div>
+
+          {/* ================= SIDEBAR ================= */}
+          <aside className="grid gap-5 sticky">
+            <div className="card pad">
+              <p className="faint text-sm font-medium">Escrow total</p>
+              <p className="mono mt-1 text-4xl font-semibold tracking-tight">{usd(deal.amountCents)}</p>
+              <div className="seg mt-4" role="img" aria-label="Where the money is">
+                {paidOut > 0 && <i style={{ flex: paidOut, background: "var(--brand)" }} />}
+                {held > 0 && <i style={{ flex: held, background: "var(--info)" }} />}
+                {returned > 0 && <i style={{ flex: returned, background: "var(--bad)" }} />}
+                {paidOut + held + returned === 0 && <i style={{ flex: 1, background: "var(--line-2)" }} />}
+              </div>
+              <dl className="mt-4 grid gap-2 text-sm">
+                <div className="flex justify-between"><dt className="muted"><span className="legend" style={{ display: "inline", margin: 0 }}><i style={{ background: "var(--info)" }} /></span>Held by PayPal</dt><dd className="mono font-medium">{usd(held)}</dd></div>
+                <div className="flex justify-between"><dt className="muted"><span className="legend" style={{ display: "inline", margin: 0 }}><i style={{ background: "var(--brand)" }} /></span>Paid to seller</dt><dd className="mono font-medium">{usd(paidOut)}</dd></div>
+                <div className="flex justify-between"><dt className="muted"><span className="legend" style={{ display: "inline", margin: 0 }}><i style={{ background: "var(--bad)" }} /></span>Returned to buyer</dt><dd className="mono font-medium">{usd(returned)}</dd></div>
+              </dl>
+              {!funded && <p className="faint mt-4 text-sm">Not funded yet. The buyer has not paid into escrow.</p>}
+            </div>
+
+            <div className="card pad">
+              <p className="faint mb-3 text-sm font-medium">People</p>
+              <div className="grid gap-3">
+                <div className="flex items-center gap-3"><span className="avatar b">{deal.buyer.slice(0, 1).toUpperCase()}</span><div><p className="font-semibold leading-tight">{deal.buyer}</p><p className="faint text-xs">Buyer</p></div></div>
+                <div className="flex items-center gap-3"><span className="avatar">{deal.seller.slice(0, 1).toUpperCase()}</span><div><p className="font-semibold leading-tight">{deal.seller}</p><p className="faint text-xs">Seller</p></div></div>
+              </div>
+            </div>
+
+            <div className="card pad">
+              <p className="mb-3 flex items-center gap-2 font-semibold"><Icon name="shield" size={18} className="text-[var(--brand)]" /> You are protected</p>
+              <ul className="check-list">
+                <li><Icon name="check" size={15} />PayPal holds the money, not the seller</li>
+                <li><Icon name="check" size={15} />AI checks each stage against the terms</li>
+                <li><Icon name="check" size={15} />Unmet work is refunded to the buyer</li>
+              </ul>
+              <p className="faint mt-3 text-xs">Deal {deal.id} · test mode</p>
+            </div>
+          </aside>
+        </div>
+      </main>
+    </>
   );
 }

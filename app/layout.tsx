@@ -1,17 +1,14 @@
 import type { Metadata } from "next";
-import { IBM_Plex_Mono, Newsreader } from "next/font/google";
+import { Geist, Geist_Mono, Instrument_Serif } from "next/font/google";
 import "./globals.css";
 
-const serif = Newsreader({
-  variable: "--font-newsreader",
+const sans = Geist({ variable: "--font-geist", subsets: ["latin"] });
+const mono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
+const display = Instrument_Serif({
+  variable: "--font-instrument",
   subsets: ["latin"],
+  weight: "400",
   style: ["normal", "italic"],
-});
-
-const mono = IBM_Plex_Mono({
-  variable: "--font-plex-mono",
-  subsets: ["latin"],
-  weight: ["400", "500"],
 });
 
 export const metadata: Metadata = {
@@ -22,7 +19,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${serif.variable} ${mono.variable}`}>
+    <html lang="en" className={`${sans.variable} ${mono.variable} ${display.variable}`}>
       <body>{children}</body>
     </html>
   );
