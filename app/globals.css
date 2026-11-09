@@ -1,26 +1,145 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --paper: #f2ecdf;
+  --paper-2: #e9e1cf;
+  --ink: #1d1a16;
+  --ink-2: #5e584c;
+  --rule: rgb(29 26 22 / 0.22);
+  --green: #1e5a3c;
+  --red: #b0341d;
+  --ochre: #86600f;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --paper: #17140f;
+    --paper-2: #211d16;
+    --ink: #ece5d5;
+    --ink-2: #a39b89;
+    --rule: rgb(236 229 213 / 0.22);
+    --green: #6dbb8e;
+    --red: #ef7a62;
+    --ochre: #d7a947;
   }
 }
 
+@theme inline {
+  --color-paper: var(--paper);
+  --color-ink: var(--ink);
+  --font-serif: var(--font-newsreader);
+  --font-mono: var(--font-plex-mono);
+}
+
+html {
+  background: var(--paper);
+}
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-newsreader), Georgia, serif;
+  font-size: 1.08rem;
+  line-height: 1.55;
+  font-optical-sizing: auto;
+}
+::selection {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+@layer components {
+  .wrap { max-width: 44rem; margin: 0 auto; padding: 0 1.25rem 7rem; }
+  .mono { font-family: var(--font-plex-mono), ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+
+  .masthead {
+    display: flex; justify-content: space-between; gap: 1rem;
+    padding: 0.9rem 0 0.7rem; margin-bottom: 3.2rem;
+    border-bottom: 3px double var(--ink);
+  }
+  .kicker {
+    font-family: var(--font-plex-mono), monospace; font-size: 0.7rem;
+    letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-2);
+  }
+  .display {
+    font-weight: 500; letter-spacing: -0.022em; line-height: 1.04;
+    font-size: clamp(2.3rem, 6.4vw, 3.5rem);
+  }
+  .title { font-weight: 500; letter-spacing: -0.015em; line-height: 1.1; font-size: clamp(1.8rem, 5vw, 2.4rem); }
+  .lede { color: var(--ink-2); font-size: 1.15rem; max-width: 34rem; }
+
+  .sec { margin-top: 3.2rem; }
+  .sec-head {
+    display: flex; align-items: baseline; gap: 0.8rem;
+    border-top: 1px solid var(--ink); padding-top: 0.6rem; margin-bottom: 1.1rem;
+  }
+  .sec-head h2 { font-size: 1.25rem; font-weight: 600; letter-spacing: -0.01em; }
+
+  .field {
+    width: 100%; background: transparent; color: inherit; font: inherit;
+    border: 0; border-bottom: 1px solid var(--rule); border-radius: 0;
+    padding: 0.45rem 0; outline: none; resize: vertical;
+  }
+  .field:focus { border-bottom-color: var(--ink); box-shadow: 0 1px 0 var(--ink); }
+  .field::placeholder { color: var(--ink-2); opacity: 0.6; font-style: italic; }
+  .label { display: block; margin-bottom: 0.1rem; }
+
+  .lined {
+    border: 0; line-height: 1.9rem; padding: 0.25rem 0.2rem 0.4rem;
+    background-image: linear-gradient(transparent calc(1.9rem - 1px), var(--rule) 1px);
+    background-size: 100% 1.9rem; background-attachment: local;
+  }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer;
+    font-family: var(--font-plex-mono), monospace; font-size: 0.76rem; font-weight: 500;
+    letter-spacing: 0.1em; text-transform: uppercase;
+    padding: 0.8rem 1.25rem; background: var(--ink); color: var(--paper);
+    border: 1px solid var(--ink); border-radius: 0;
+    transition: background 0.12s, color 0.12s;
+  }
+  .btn:hover:not(:disabled) { background: transparent; color: var(--ink); }
+  .btn:disabled { opacity: 0.35; cursor: not-allowed; }
+  .btn-ghost { background: transparent; color: var(--ink); }
+  .btn-ghost:hover:not(:disabled) { background: var(--ink); color: var(--paper); }
+  .btn-green { background: var(--green); border-color: var(--green); color: var(--paper); }
+  .btn-green:hover:not(:disabled) { background: transparent; color: var(--green); }
+  .btn-red { background: var(--red); border-color: var(--red); color: var(--paper); }
+  .btn-red:hover:not(:disabled) { background: transparent; color: var(--red); }
+
+  .link { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; cursor: pointer; }
+  .link:hover { text-decoration-thickness: 2px; }
+
+  .stamp {
+    display: inline-block; font-family: var(--font-plex-mono), monospace; font-size: 0.68rem;
+    letter-spacing: 0.14em; text-transform: uppercase; white-space: nowrap;
+    padding: 0.18rem 0.5rem; border: 1.5px solid currentColor; transform: rotate(-1.5deg);
+    color: var(--ink-2);
+  }
+  .stamp.released { color: var(--green); }
+  .stamp.refunded { color: var(--red); }
+  .stamp.partial, .stamp.needs_review { color: var(--ochre); }
+  .stamp.funded { color: var(--ink); }
+  .stamp.awaiting_payment, .stamp.pending { border-style: dashed; }
+
+  .leader { flex: 1; border-bottom: 1px dotted var(--ink-2); transform: translateY(-0.28em); min-width: 1rem; opacity: 0.6; }
+  .row { display: flex; align-items: baseline; gap: 0.7rem; }
+
+  .entry { display: grid; grid-template-columns: 3rem 1fr; gap: 0 0.5rem; padding: 1.3rem 0; border-top: 1px solid var(--rule); }
+  .entry:first-child { border-top: 0; padding-top: 0.4rem; }
+  .numeral { font-family: var(--font-plex-mono), monospace; font-size: 1.5rem; line-height: 1.1; color: var(--ink-2); }
+
+  .dash li { position: relative; padding-left: 1.3rem; }
+  .dash li::before { content: "\2014"; position: absolute; left: 0; color: var(--ink-2); }
+
+  .note { border-left: 2px solid var(--ink); padding: 0.1rem 0 0.1rem 1rem; margin-top: 1rem; }
+  .flag { border: 1px solid var(--red); color: var(--red); padding: 0.6rem 0.8rem; margin-top: 0.8rem; background: color-mix(in srgb, var(--red) 7%, transparent); }
+  .warn { border-left: 3px solid var(--ochre); background: color-mix(in srgb, var(--ochre) 9%, transparent); padding: 0.8rem 1rem; }
+  .err { border: 1px solid var(--red); color: var(--red); padding: 0.6rem 0.9rem; margin-top: 1.2rem; }
+
+  .tabs { display: inline-flex; gap: 1.4rem; border-bottom: 1px solid var(--rule); }
+  .tab { font-family: var(--font-plex-mono), monospace; font-size: 0.74rem; letter-spacing: 0.1em; text-transform: uppercase; padding: 0.45rem 0; color: var(--ink-2); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+  .tab[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ink); }
+
+  .log { font-family: var(--font-plex-mono), monospace; font-size: 0.78rem; color: var(--ink-2); }
+  .log li { display: grid; grid-template-columns: 7rem 1fr; padding: 0.15rem 0; }
 }
