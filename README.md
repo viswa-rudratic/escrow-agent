@@ -1,4 +1,8 @@
-# 🛡️ Escrow Agent
+<p align="center">
+  <img src="public/logo-512.png" alt="Escrow Agent logo" width="96" height="96" />
+</p>
+
+# Escrow Agent
 
 **Paste a WhatsApp deal chat → AI turns it into a protected contract → PayPal holds the money → AI verifies the work (text *and* images) before the seller is paid.**
 

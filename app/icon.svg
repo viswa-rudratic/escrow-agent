@@ -1,1 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#0b6b4a"/><path d="M16 6 8 9v6c0 4.7 3.3 8 8 9.5 4.7-1.5 8-4.8 8-9.5V9l-8-3z" fill="none" stroke="#fff" stroke-width="2" stroke-linejoin="round"/><path d="m12.5 15.5 2.5 2.5 4.5-4.5" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Escrow Agent">
+  <rect width="64" height="64" rx="16" fill="#0b6b4a"/>
+  <path fill="#ffffff" d="M22 14H42A10 10 0 0 1 52 24V34A10 10 0 0 1 42 44H31L20 53L22 44A10 10 0 0 1 12 34V24A10 10 0 0 1 22 14Z"/>
+  <circle cx="32" cy="26.6" r="4.3" fill="#0b6b4a"/>
+  <path fill="#0b6b4a" d="M29.9 29.2H34.1L35.7 36.4H28.3Z"/>
+</svg>

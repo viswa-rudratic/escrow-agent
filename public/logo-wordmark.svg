@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 272 64" role="img" aria-label="Escrow Agent">
+
+  <rect width="64" height="64" rx="16" fill="#0b6b4a"/>
+  <path fill="#ffffff" d="M22 14H42A10 10 0 0 1 52 24V34A10 10 0 0 1 42 44H31L20 53L22 44A10 10 0 0 1 12 34V24A10 10 0 0 1 22 14Z"/>
+  <circle cx="32" cy="26.6" r="4.3" fill="#0b6b4a"/>
+  <path fill="#0b6b4a" d="M29.9 29.2H34.1L35.7 36.4H28.3Z"/>
+
+
+  <text x="82" y="42" font-family="Geist, Inter, 'Segoe UI', Arial, sans-serif" font-size="30" font-weight="650" letter-spacing="-0.6" fill="#0f1713">Escrow Agent</text>
+</svg>
